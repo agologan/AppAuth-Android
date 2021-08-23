@@ -29,6 +29,7 @@ import android.text.TextUtils;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.browser.customtabs.CustomTabsIntent;
 
 import net.openid.appauth.AuthorizationException.GeneralErrors;
@@ -229,6 +230,14 @@ public class AuthorizationService {
                 completedIntent,
                 canceledIntent,
                 customTabsIntent);
+    }
+
+    public static void registerAuthorizationRequest(@NonNull AuthorizationRequest authRequest) {
+        AuthorizationManagementActivity.registerAuthorizationRequest(authRequest);
+    }
+
+    public static void registerAuthorizationResponseActivity(Class<?> authResponseActivity) {
+        AuthorizationManagementActivity.registerAuthorizationResponseActivity(authResponseActivity);
     }
 
     /**

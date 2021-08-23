@@ -170,6 +170,18 @@ public final class LoginActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onNewIntent(Intent data) {
+        super.onNewIntent(data);
+
+        // Brittle check, should actually name the intent to figure out if it's the correct one
+        if (data.getExtras() != null) {
+            Intent intent = new Intent(this, TokenActivity.class);
+            intent.putExtras(data.getExtras());
+            startActivity(intent);
+        }
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         displayAuthOptions();
@@ -417,6 +429,8 @@ public final class LoginActivity extends AppCompatActivity {
     @MainThread
     private void initializeAuthRequest() {
         createAuthRequest(getLoginHint());
+        AuthorizationService.registerAuthorizationRequest(mAuthRequest.get());
+        AuthorizationService.registerAuthorizationResponseActivity(LoginActivity.class);
         warmUpBrowser();
         displayAuthOptions();
     }
@@ -475,7 +489,8 @@ public final class LoginActivity extends AppCompatActivity {
                 mClientId.get(),
                 ResponseTypeValues.CODE,
                 mConfiguration.getRedirectUri())
-                .setScope(mConfiguration.getScope());
+                .setScope(mConfiguration.getScope())
+                .setState(null); // Needs null state b/c the callback will not have a state.
 
         if (!TextUtils.isEmpty(loginHint)) {
             authRequestBuilder.setLoginHint(loginHint);

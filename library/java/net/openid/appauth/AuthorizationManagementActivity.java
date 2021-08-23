@@ -150,6 +150,9 @@ public class AuthorizationManagementActivity extends AppCompatActivity {
     private PendingIntent mCompleteIntent;
     private PendingIntent mCancelIntent;
 
+    private static AuthorizationManagementRequest sAuthRequest;
+    private static Class<?> sAuthResponseActivity;
+
     /**
      * Creates an intent to start an authorization flow.
      * @param context the package context for the app.
@@ -203,9 +206,21 @@ public class AuthorizationManagementActivity extends AppCompatActivity {
         return new Intent(context, AuthorizationManagementActivity.class);
     }
 
+    public static void registerAuthorizationRequest(AuthorizationManagementRequest authRequest) {
+        sAuthRequest = authRequest;
+    }
+
+    public static void registerAuthorizationResponseActivity(Class<?> authResponseActivity) {
+        sAuthResponseActivity = authResponseActivity;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Brittle check, should check if the auth was initiated in
+        if (savedInstanceState == null && getIntent().getExtras() == null) {
+            return;
+        }
         if (savedInstanceState == null) {
             extractState(getIntent().getExtras());
         } else {
@@ -223,7 +238,8 @@ public class AuthorizationManagementActivity extends AppCompatActivity {
          * stack underneath the authorization activity.
          */
 
-        if (!mAuthorizationStarted) {
+        // Brittle check, should actually differentiate between intents properly.
+        if (!mAuthorizationStarted && getIntent().getData() == null) {
             try {
                 startActivity(mAuthIntent);
                 mAuthorizationStarted = true;
@@ -335,7 +351,14 @@ public class AuthorizationManagementActivity extends AppCompatActivity {
                 Logger.error("Failed to send cancel intent", e);
             }
         } else {
-            setResult(resultCode, cancelData);
+            if (mAuthIntent != null) {
+                setResult(resultCode, cancelData);
+            } else {
+                Intent intent = new Intent(this, sAuthResponseActivity);
+                intent.putExtras(cancelData.getExtras());
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+            }
         }
     }
 
@@ -343,17 +366,18 @@ public class AuthorizationManagementActivity extends AppCompatActivity {
         if (responseUri.getQueryParameterNames().contains(AuthorizationException.PARAM_ERROR)) {
             return AuthorizationException.fromOAuthRedirect(responseUri).toIntent();
         } else {
+            AuthorizationManagementRequest authRequest = mAuthRequest != null ? mAuthRequest : sAuthRequest;
             AuthorizationManagementResponse response =
-                    AuthorizationManagementUtil.responseWith(mAuthRequest, responseUri);
+                    AuthorizationManagementUtil.responseWith(authRequest, responseUri);
 
-            if (mAuthRequest.getState() == null && response.getState() != null
-                    || (mAuthRequest.getState() != null && !mAuthRequest.getState()
+            if (authRequest.getState() == null && response.getState() != null
+                    || (authRequest.getState() != null && !authRequest.getState()
                     .equals(response.getState()))) {
 
                 Logger.warn("State returned in authorization response (%s) does not match state "
                         + "from request (%s) - discarding response",
                         response.getState(),
-                        mAuthRequest.getState());
+                        authRequest.getState());
 
                 return AuthorizationRequestErrors.STATE_MISMATCH.toIntent();
             }
